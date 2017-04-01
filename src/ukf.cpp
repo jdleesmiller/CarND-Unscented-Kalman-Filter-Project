@@ -30,6 +30,9 @@ UKF::UKF() {
 
   time_us_ = 0;
 
+  NIS_radar_ = 0;
+  NIS_laser_ = 0;
+
   // initial state vector
   x_ = VectorXd(5);
 
@@ -257,10 +260,7 @@ void UKF::UpdateLidar(MeasurementPackage measurement_package) {
   MatrixXd I = MatrixXd::Identity(x_size, x_size);
   P_ = (I - K * H) * P_;
 
-  /**
-  TODO:
-  You'll also need to calculate the lidar NIS.
-  */
+  NIS_laser_ = y.transpose() * Si * y;
 }
 
 void UKF::InitializeRadar(MeasurementPackage measurement_package) {
@@ -362,9 +362,5 @@ void UKF::UpdateRadar(MeasurementPackage measurement_package) {
   x_ = x_ + K * dz;
   P_ = P_ - K * S * K.transpose();
 
-  /**
-  TODO:
-
-  You'll also need to calculate the radar NIS.
-  */
+  NIS_radar_ = dz.transpose() * S.inverse() * dz;
 }
