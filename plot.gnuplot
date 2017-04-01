@@ -25,14 +25,16 @@ set size 1.0, 0.4
 plot datafile using 1:2 with lines title 'est xy', \
   datafile using 8:9 with lines title 'gt xy'
 
-set title 'Estimated vs Ground Truth Yaw'
+set title 'Estimated vs Ground Truth X and Y Velocities'
 set xlabel 'Time Index'
-set ylabel 'Yaw'
+set ylabel 'X or Y Velocity'
 set origin 0.0, 0.4
 set size 1.0, 0.2
 
-plot datafile using 3 with lines title 'est yaw', \
-  datafile using (atan2($11,$10)) with lines title 'gt yaw'
+plot datafile using ($3*cos($4)) with lines title 'est vx', \
+  datafile using 10 with lines title 'gt vx', \
+  datafile using ($3*sin($4)) with lines title 'est vy', \
+  datafile using 11 with lines title 'gt vy'
 
 set title 'Estimated vs Ground Truth Speed'
 set xlabel 'Time Index'
