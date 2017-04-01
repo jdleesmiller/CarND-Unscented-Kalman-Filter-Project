@@ -18,6 +18,16 @@ UKF::UKF() {
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
 
+  n_x_ = 5;
+  n_aug_ = 7;
+  lambda_ = 3 - n_x_;
+
+  weights_ = VectorXd(2 * n_aug_ + 1);
+  weights_.fill(1 / (2 * (lambda_ + n_aug_)));
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
+
+  Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
+
   // initial state vector
   x_ = VectorXd(5);
 
@@ -95,12 +105,75 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
  * measurement and this one.
  */
 void UKF::Prediction(double delta_t) {
-  /**
-  TODO:
+  //
+  // Generate (augmented) sigma points.
+  //
+  int n_sig_aug = 2 * n_aug_ + 1;
 
-  Complete this function! Estimate the object's location. Modify the state
-  vector, x_. Predict sigma points, the state, and the state covariance matrix.
-  */
+  VectorXd x_aug(n_aug_);
+  x_aug.fill(0.0);
+  x_aug.head(n_x_) = x_;
+
+  MatrixXd P_aug(n_aug_, n_aug_);
+  P_aug.fill(0.0);
+  P_aug.topLeftCorner(n_x_, n_x_) = P_;
+  P_aug(5, 5) = std_a_ * std_a_;
+  P_aug(6, 6) = std_yawdd_ * std_yawdd_;
+
+  MatrixXd A_aug = P_aug.llt().matrixL(); // matrix square root
+  double d = sqrt(lambda_ + n_x_);
+
+  MatrixXd Xsig_aug(n_aug_, n_sig_aug);
+  Xsig_aug.col(0) = x_aug;
+  Xsig_aug.block(0, 1, n_aug_, n_aug_) =
+    (d * A_aug).colwise() + x_aug;
+  Xsig_aug.block(0, n_aug_ + 1, n_aug_, n_aug_) =
+    (-d * A_aug).colwise() + x_aug;
+
+  //
+  // Predict (augmented) sigma points.
+  //
+  double hdt2 = 0.5 * delta_t * delta_t;
+  for (int i = 0; i < n_sig_aug; ++i) {
+    double px = Xsig_aug(0, i);
+    double py = Xsig_aug(1, i);
+    double v = Xsig_aug(2, i);
+    double yaw = Xsig_aug(3, i);
+    double dyaw = Xsig_aug(4, i);
+    double nu_a = Xsig_aug(5, i);
+    double nu_dyaw = Xsig_aug(6, i);
+
+    if (fabs(dyaw) > 1e-3) {
+      double r = v / dyaw;
+      Xsig_pred_(0, i) =
+        px + r * (sin(yaw + dyaw * delta_t) - sin(yaw)) +
+        hdt2 * cos(yaw) * nu_a;
+      Xsig_pred_(1, i) =
+        py + r * (-cos(yaw + dyaw * delta_t) + cos(yaw)) +
+        hdt2 * sin(yaw) * nu_a;
+    } else {
+      Xsig_pred_(0, i) =
+        px + v * cos(yaw) * delta_t +
+        hdt2 * cos(yaw) * nu_a;
+      Xsig_pred_(1, i) =
+        py + v * sin(yaw) * delta_t +
+        hdt2 * sin(yaw) * nu_a;
+    }
+    Xsig_pred_(2, i) = v + delta_t * nu_a;
+    Xsig_pred_(3, i) = yaw + dyaw * delta_t + hdt2 * nu_dyaw;
+    Xsig_pred_(4, i) = dyaw + delta_t * nu_dyaw;
+  }
+
+  //
+  // Update mean and covariance from predicted sigma points.
+  //
+  x_ = Xsig_pred_ * weights_;
+
+  P_.fill(0.0);
+  for (int i = 0; i < n_sig_aug; ++i) {
+    VectorXd d = Xsig_pred_.col(i) - x_;
+    P_ += weights_(i) * d * d.transpose();
+  }
 }
 
 void UKF::InitializeLidar(MeasurementPackage measurement_package) {
