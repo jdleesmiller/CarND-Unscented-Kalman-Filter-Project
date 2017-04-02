@@ -26,10 +26,10 @@ void check_arguments(int argc, char* argv[]) {
     cerr << usage_instructions << endl;
   } else if (argc == 2) {
     cerr << "Please include an output file.\n" << usage_instructions << endl;
-  } else if (argc == 3) {
+  } else if (argc <= 9) {
     has_valid_args = true;
-  } else if (argc > 3) {
-    cerr << "Too many arguments.\n" << usage_instructions << endl;
+  } else {
+    cerr << "Expected at most 9 arguments.\n" << usage_instructions << endl;
   }
 
   if (!has_valid_args) {
@@ -61,6 +61,30 @@ int main(int argc, char* argv[]) {
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
 
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
+
+  //
+  // Read in optional command line arguments.
+  //
+  bool use_laser = UKF::DEFAULT_USE_LASER;
+  bool use_radar = UKF::DEFAULT_USE_RADAR;
+  double std_a = UKF::DEFAULT_STD_A;
+  double std_yawdd = UKF::DEFAULT_STD_YAWD;
+  double lambda = UKF::DEFAULT_LAMBDA;
+  bool nis_by_sensor = false;
+  switch (argc) {
+    case 9:
+    nis_by_sensor = string(argv[8]).compare("true") == 0;
+    case 8:
+    lambda = atof(argv[7]);
+    case 7:
+    std_yawdd = atof(argv[6]);
+    case 6:
+    std_a = atof(argv[5]);
+    case 5:
+    use_radar = string(argv[4]).compare("true") == 0;
+    case 4:
+    use_laser = string(argv[3]).compare("true") == 0;
+  }
 
   /**********************************************
    *  Set Measurements                          *
@@ -130,7 +154,13 @@ int main(int argc, char* argv[]) {
   }
 
   // Create a UKF instance
-  UKF ukf;
+  UKF ukf(
+    use_laser,
+    use_radar,
+    std_a,
+    std_yawdd,
+    lambda
+  );
 
   // used to compute the RMSE later
   vector<VectorXd> estimations;
@@ -153,8 +183,12 @@ int main(int argc, char* argv[]) {
   out_file_ << "py_true" << "\t";
   out_file_ << "vx_true" << "\t";
   out_file_ << "vy_true" << "\t";
-  out_file_ << "NIS" << "\n";
-
+  if (nis_by_sensor) {
+    out_file_ << "NIS_laser" << "\t";
+    out_file_ << "NIS_radar" << "\n";
+  } else {
+    out_file_ << "NIS" << "\n";
+  }
 
   for (size_t k = 0; k < number_of_measurements; ++k) {
     // Call the UKF-based fusion
@@ -191,13 +225,17 @@ int main(int argc, char* argv[]) {
     out_file_ << gt_pack_list[k].gt_values_(3) << "\t";
 
     // output the NIS values
-    
-    if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER) {
-      out_file_ << ukf.NIS_laser_ << "\n";
-    } else if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::RADAR) {
-      out_file_ << ukf.NIS_radar_ << "\n";
-    }
 
+    if (nis_by_sensor) {
+      out_file_ << ukf.NIS_laser_ << "\t";
+      out_file_ << ukf.NIS_radar_ << "\n";
+    } else {
+      if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER) {
+        out_file_ << ukf.NIS_laser_ << "\n";
+      } else if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::RADAR) {
+        out_file_ << ukf.NIS_radar_ << "\n";
+      }
+    }
 
     // convert ukf x vector to cartesian to compare to ground truth
     VectorXd ukf_x_cartesian_ = VectorXd(4);
@@ -206,9 +244,9 @@ int main(int argc, char* argv[]) {
     float y_estimate_ = ukf.x_(1);
     float vx_estimate_ = ukf.x_(2) * cos(ukf.x_(3));
     float vy_estimate_ = ukf.x_(2) * sin(ukf.x_(3));
-    
+
     ukf_x_cartesian_ << x_estimate_, y_estimate_, vx_estimate_, vy_estimate_;
-    
+
     estimations.push_back(ukf_x_cartesian_);
     ground_truth.push_back(gt_pack_list[k].gt_values_);
 

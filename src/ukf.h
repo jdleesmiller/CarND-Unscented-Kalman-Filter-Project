@@ -74,10 +74,31 @@ public:
   ///* the current NIS for laser
   double NIS_laser_;
 
+  const static bool DEFAULT_USE_LASER;
+  const static bool DEFAULT_USE_RADAR;
+  const static double DEFAULT_STD_A;
+  const static double DEFAULT_STD_YAWD;
+  const static double DEFAULT_LAMBDA;
+
   /**
-   * Constructor
+   * Constructor.
+   *
+   * @param use_laser if false, lidar measurements will be ignored except during
+   *                  init
+   * @param use_radar if false, radar measurements will be ignored except during
+   *                  init
+   * @param std_a process noise standard deviation: longitudinal acceleration
+   *              in m/s^2
+   * @param std_yawdd process noise standard deviation yaw acceleration in
+   *                  rad/s^2
+   * @param lambda scaling parameter for UKF sigma points
    */
-  UKF();
+  UKF(
+    bool use_laser = DEFAULT_USE_LASER,
+    bool use_radar = DEFAULT_USE_RADAR,
+    double std_a = DEFAULT_STD_A,
+    double std_yawdd = DEFAULT_STD_YAWD,
+    double lambda = DEFAULT_LAMBDA);
 
   /**
    * Destructor

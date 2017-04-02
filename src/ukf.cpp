@@ -8,19 +8,25 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
 
+const bool UKF::DEFAULT_USE_LASER = true;
+const bool UKF::DEFAULT_USE_RADAR = true;
+const double UKF::DEFAULT_STD_A = 1.0;
+const double UKF::DEFAULT_STD_YAWD = M_PI / 6.0;
+const double UKF::DEFAULT_LAMBDA = 6.0 - 7.0;
+
 /**
  * Initializes Unscented Kalman filter
  */
-UKF::UKF() {
-  // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = true;
-
-  // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = true;
-
+UKF::UKF(bool use_laser, bool use_radar, double std_a, double std_yawdd,
+    double lambda) :
+  use_laser_(use_laser),
+  use_radar_(use_radar),
+  std_a_(std_a),
+  std_yawdd_(std_yawdd),
+  lambda_(lambda)
+{
   n_x_ = 5;
   n_aug_ = 7;
-  lambda_ = 6 - n_aug_;
 
   weights_ = VectorXd(2 * n_aug_ + 1);
   weights_.fill(1 / (2 * (lambda_ + n_aug_)));
@@ -39,12 +45,6 @@ UKF::UKF() {
   // initial covariance matrix
   P_ = MatrixXd(5, 5);
 
-  // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1;
-
-  // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = M_PI / 6;
-
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
 
@@ -59,14 +59,6 @@ UKF::UKF() {
 
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
-
-  /**
-  TODO:
-
-  Complete the initialization. See ukf.h for other member properties.
-
-  Hint: one or more values initialized above might be wildly off...
-  */
 }
 
 UKF::~UKF() {}
