@@ -147,7 +147,12 @@ void UKF::Prediction(double delta_t) {
   P_aug(5, 5) = std_a_ * std_a_;
   P_aug(6, 6) = std_yawdd_ * std_yawdd_;
 
-  MatrixXd A_aug = P_aug.llt().matrixL(); // matrix square root
+  Eigen::LLT<MatrixXd> lltA = P_aug.llt();
+  if (lltA.info() != Eigen::ComputationInfo::Success) {
+    cerr << "Cholesky failed with ComputationInfo=" << lltA.info() << endl;
+    exit(-1);
+  }
+  MatrixXd A_aug = lltA.matrixL(); // matrix square root
   double d = sqrt(lambda_ + n_aug_);
   cout << "PREDICT A_aug" << endl << A_aug << endl;
 
@@ -158,8 +163,8 @@ void UKF::Prediction(double delta_t) {
   Xsig_aug.block(0, n_aug_ + 1, n_aug_, n_aug_) =
     (-d * A_aug).colwise() + x_aug;
 
-  cout << "PREDICT delta_t = " << delta_t << endl;
-  cout << "PREDICT Xsig_aug = " << endl << Xsig_aug << endl;
+  // cout << "PREDICT delta_t = " << delta_t << endl;
+  // cout << "PREDICT Xsig_aug = " << endl << Xsig_aug << endl;
 
   //
   // Predict (augmented) sigma points.
@@ -200,7 +205,7 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(4, i) = dyaw + delta_t * nu_dyaw;
   }
 
-  cout << "PREDICT Xsig_pred = " << endl << Xsig_pred_ << endl;
+  // cout << "PREDICT Xsig_pred = " << endl << Xsig_pred_ << endl;
 
   //
   // Update mean and covariance from predicted sigma points.
@@ -252,15 +257,15 @@ void UKF::UpdateLidar(MeasurementPackage measurement_package) {
 
   VectorXd z_pred = H * x_;
   VectorXd y = z - z_pred;
-  cout << "LIDAR y=" << y.transpose() << endl;
+  // cout << "LIDAR y=" << y.transpose() << endl;
   MatrixXd Ht = H.transpose();
   MatrixXd S = H * P_ * Ht + R;
   MatrixXd Si = S.inverse();
   MatrixXd PHt = P_ * Ht;
   MatrixXd K = PHt * Si;
-  cout << "LIDAR K=" << endl << K << endl;
-  cout << "LIDAR KH=" << endl << K * H << endl;
-  cout << "LIDAR pre-P=" << endl << P_ << endl;
+  // cout << "LIDAR K=" << endl << K << endl;
+  // cout << "LIDAR KH=" << endl << K * H << endl;
+  // cout << "LIDAR pre-P=" << endl << P_ << endl;
 
   //new estimate
   x_ = x_ + (K * y);
@@ -355,8 +360,8 @@ void UKF::UpdateRadar(MeasurementPackage measurement_package) {
     Tc += weights_(i) * xdiff * zdiff.transpose();
   }
 
-  cout << "S = " << endl << S << endl;
-  cout << "Sinv = " << endl << S.inverse() << endl;
+  // cout << "S = " << endl << S << endl;
+  // cout << "Sinv = " << endl << S.inverse() << endl;
 
   //calculate Kalman gain K
   MatrixXd K = Tc * S.inverse();
