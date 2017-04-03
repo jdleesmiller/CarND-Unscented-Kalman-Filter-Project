@@ -70,7 +70,7 @@ UKF::~UKF() {}
 void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
   switch (measurement_package.sensor_type_) {
     case MeasurementPackage::RADAR:
-      cout << "RADAR" << endl;
+      // cout << "RADAR" << endl;
       if (is_initialized_) {
         if (use_radar_) {
           double delta_t = (measurement_package.timestamp_ - time_us_) / 1e6;
@@ -83,7 +83,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
       }
       break;
     case MeasurementPackage::LASER:
-      cout << "LIDAR" << endl;
+      // cout << "LIDAR" << endl;
       if (is_initialized_) {
         if (use_laser_) {
           double delta_t = (measurement_package.timestamp_ - time_us_) / 1e6;
@@ -101,8 +101,8 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
       exit(EXIT_FAILURE);
   }
   time_us_ = measurement_package.timestamp_;
-  cout << "x_ = " << endl << x_ << endl;
-  cout << "P_ = " << endl << P_ << endl;
+  // cout << "x_ = " << endl << x_ << endl;
+  // cout << "P_ = " << endl << P_ << endl;
 }
 
 // Based on
@@ -112,9 +112,9 @@ double NormalizeAngle(double theta) {
   const double TAU = 2 * M_PI;
   double x = theta;
   double r = theta - TAU * floor((theta + M_PI) / TAU);
-  if (fabs(x - r) > 1e-3) {
-    cout << "NORM " << x/M_PI << " -> " << r/M_PI << endl;
-  }
+  // if (fabs(x - r) > 1e-3) {
+  //   cout << "NORM " << x/M_PI << " -> " << r/M_PI << endl;
+  // }
   return r;
 }
 
@@ -146,7 +146,7 @@ void UKF::Prediction(double delta_t) {
   }
   MatrixXd A_aug = lltA.matrixL(); // matrix square root
   double d = sqrt(lambda_ + n_aug_);
-  cout << "PREDICT A_aug" << endl << A_aug << endl;
+  // cout << "PREDICT A_aug" << endl << A_aug << endl;
 
   MatrixXd Xsig_aug(n_aug_, n_sig_aug);
   Xsig_aug.col(0) = x_aug;
@@ -358,7 +358,7 @@ void UKF::UpdateRadar(MeasurementPackage measurement_package) {
   //calculate Kalman gain K
   MatrixXd K = Tc * S.inverse();
 
-  cout << "K = " << endl << K << endl;
+  // cout << "K = " << endl << K << endl;
 
   VectorXd dz = z - z_pred;
   dz(1) = NormalizeAngle(dz(1));
