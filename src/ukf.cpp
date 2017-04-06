@@ -355,8 +355,12 @@ void UKF::UpdateRadar(MeasurementPackage measurement_package) {
   // cout << "S = " << endl << S << endl;
   // cout << "Sinv = " << endl << S.inverse() << endl;
 
-  //calculate Kalman gain K
-  MatrixXd K = Tc * S.inverse();
+  // Calculate Kalman gain K = T_c * S^{-1}. To avoid the explicit inverse, we
+  // can rewrite this as KS = T_c, and then
+  // S^T K^T = T_c^T
+  // which is in standard form.
+  Eigen::FullPivLU<MatrixXd> lu(S.transpose());
+  MatrixXd K = lu.solve(Tc.transpose()).transpose();
 
   // cout << "K = " << endl << K << endl;
 
@@ -368,5 +372,21 @@ void UKF::UpdateRadar(MeasurementPackage measurement_package) {
   x_(3) = NormalizeAngle(x_(3));
   P_ = P_ - K * S * K.transpose();
 
-  NIS_radar_ = dz.transpose() * S.inverse() * dz;
+  // Compute the normalized innovation score z^T S^{-1} z. We already have the
+  // LU factorization of S^T, so we would like to reuse it. To do this, if we
+  // start with
+  // N = z^T S^{-1} z
+  // then
+  // N = (S^{-1}^T z)^T z
+  // so
+  // N = (S^T^{-1} z)^T z
+  // since the transpose of an inverse equals the inverse of a transpose. Let
+  // c = S^T^{-1} z
+  // and premultiply by S^T to obtain
+  // S^T c = z
+  // which is in standard form. If we solve for c, we can then use
+  // N = c^T z
+  // to obtain the NIS score without the explicit matrix inverse.
+  VectorXd c = lu.solve(dz);
+  NIS_radar_ = c.transpose() * dz;
 }

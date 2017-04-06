@@ -5,6 +5,19 @@ Self-Driving Car Engineer Nanodegree Program
 
 ## Notes
 
+Baseline (DS1) after tuning:
+
+Accuracy - RMSE:
+0.0790962
+0.0896279
+ 0.601625
+ 0.585349
+Done!
+
+real	0m0.312s
+user	0m0.278s
+sys	0m0.013s
+
 ### Radar not tracking
 
 This seems like a bug... without lidar, it is pretty hopeless on dataset 2.
@@ -47,6 +60,10 @@ A few hidden parameters:
 - if we do more aggressive normalisation, there may be more
 
 Setting a low value acceleration noise value seems to be required for dataset 2. A lower yaw noise also helps on dataset 2, but setting the yaw noise too low increases RMSE on dataset 1.
+
+### Avoid explicit inverses
+
+Instead, use LU solve. This should be more numerically stable. It also seems to improve performance by 5%-10% on dataset 1, even though the matrices are very small.
 
 ## Dependencies
 
