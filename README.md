@@ -24,6 +24,10 @@ I think the Gaussian assumption is only valid when both the yaw rate and the yaw
 Do we also need to do something about its variance, to prevent the variance from blowing up? In reality, if we have variance of ~2pi, we have no idea what the yaw rate is. We could just clamp it, but...
 
 Actually, I think the problem is that we get a negative variance term in P, because lambda is too negative.
+This can happen, according to the original paper: http://jimbeck.caltech.edu/summerlectures/references/Unscented%20Kalman%20filter.pdf
+They mention that there is a way around it, but for now I've just added a check for P becoming non-positive definite (in which case the Cholesky step fails)
+
+Alternative way of setting lambda: http://www.cslu.ogi.edu/nsel/ukf/node6.html
 
 ### Output does not tell you whether it's laser or radar NIS
 

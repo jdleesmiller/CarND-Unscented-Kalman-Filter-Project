@@ -70,10 +70,10 @@ int main(int argc, char* argv[]) {
   double std_a = UKF::DEFAULT_STD_A;
   double std_yawdd = UKF::DEFAULT_STD_YAWD;
   double lambda = UKF::DEFAULT_LAMBDA;
-  bool nis_by_sensor = false;
+  bool output_for_tuning = false;
   switch (argc) {
     case 9:
-    nis_by_sensor = string(argv[8]).compare("true") == 0;
+    output_for_tuning = string(argv[8]).compare("true") == 0;
     case 8:
     lambda = atof(argv[7]);
     case 7:
@@ -183,12 +183,10 @@ int main(int argc, char* argv[]) {
   out_file_ << "py_true" << "\t";
   out_file_ << "vx_true" << "\t";
   out_file_ << "vy_true" << "\t";
-  if (nis_by_sensor) {
-    out_file_ << "NIS_laser" << "\t";
-    out_file_ << "NIS_radar" << "\n";
-  } else {
-    out_file_ << "NIS" << "\n";
+  if (output_for_tuning) {
+    out_file_ << "sensor" << "\t";
   }
+  out_file_ << "NIS" << "\n";
 
   for (size_t k = 0; k < number_of_measurements; ++k) {
     // Call the UKF-based fusion
@@ -225,16 +223,16 @@ int main(int argc, char* argv[]) {
     out_file_ << gt_pack_list[k].gt_values_(3) << "\t";
 
     // output the NIS values
-
-    if (nis_by_sensor) {
-      out_file_ << ukf.NIS_laser_ << "\t";
-      out_file_ << ukf.NIS_radar_ << "\n";
-    } else {
-      if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER) {
-        out_file_ << ukf.NIS_laser_ << "\n";
-      } else if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::RADAR) {
-        out_file_ << ukf.NIS_radar_ << "\n";
+    if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER) {
+      if (output_for_tuning) {
+        out_file_ << "L\t";
       }
+      out_file_ << ukf.NIS_laser_ << "\n";
+    } else if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::RADAR) {
+      if (output_for_tuning) {
+        out_file_ << "R\t";
+      }
+      out_file_ << ukf.NIS_radar_ << "\n";
     }
 
     // convert ukf x vector to cartesian to compare to ground truth

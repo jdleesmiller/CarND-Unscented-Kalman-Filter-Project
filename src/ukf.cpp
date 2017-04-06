@@ -10,9 +10,9 @@ using std::vector;
 
 const bool UKF::DEFAULT_USE_LASER = true;
 const bool UKF::DEFAULT_USE_RADAR = true;
-const double UKF::DEFAULT_STD_A = 1.0;
-const double UKF::DEFAULT_STD_YAWD = M_PI / 6.0;
-const double UKF::DEFAULT_LAMBDA = 6.0 - 7.0;
+const double UKF::DEFAULT_STD_A = 0.267;
+const double UKF::DEFAULT_STD_YAWD = M_PI / 5.9;
+const double UKF::DEFAULT_LAMBDA = 1.79 - 7.0;
 
 /**
  * Initializes Unscented Kalman filter

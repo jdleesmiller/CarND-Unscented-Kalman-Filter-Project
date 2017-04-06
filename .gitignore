@@ -4,4 +4,7 @@
 # build files
 build/
 
+.ipynb_checkpoints
+
+data/search*
 data/output*
