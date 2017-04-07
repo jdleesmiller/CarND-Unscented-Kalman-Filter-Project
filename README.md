@@ -18,6 +18,11 @@ real	0m0.312s
 user	0m0.278s
 sys	0m0.013s
 
+0.181703
+0.187452
+0.292064
+0.415499
+
 ### Radar not tracking
 
 This seems like a bug... without lidar, it is pretty hopeless on dataset 2.
@@ -64,6 +69,12 @@ Setting a low value acceleration noise value seems to be required for dataset 2.
 ### Avoid explicit inverses
 
 Instead, use LU solve. This should be more numerically stable. It also seems to improve performance by 5%-10% on dataset 1, even though the matrices are very small.
+
+### Use fixed-size matrices
+
+Eigen provides both fixed and dynamic-sized matrices; fixed size matrices provide more compile-time correctness checking and should in principle be faster by allowing the compiler to do more optimisation.
+
+The refactored code was also about 15% faster than the baseline, but I also made some other improvements, such as combining the two loops in the radar update and re-using the LU factorisation for the update to calculate the NIS score, so those may also have contributed.
 
 ## Dependencies
 

@@ -1,72 +1,27 @@
 #ifndef UKF_H
 #define UKF_H
 
-#include "measurement_package.h"
-#include "Eigen/Dense"
 #include <vector>
 #include <string>
-#include <fstream>
-#include "tools.h"
+#include <iostream>
 
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
+#include "Eigen/Dense"
+
+#include "measurement_package.h"
+#include "kalman_filter.h"
 
 class UKF {
+  struct CanonicalizeStateAngle {
+    void operator()(Eigen::Matrix<double, 5, 1> &vector) const;
+  };
+
+  struct CanonicalizeMeasurementAngle {
+    void operator()(Eigen::Matrix<double, 3, 1> &vector) const;
+  };
+
+  typedef UnscentedKalmanFilter<5, 7, CanonicalizeStateAngle> Filter;
+
 public:
-
-  ///* initially set to false, set to true in first call of ProcessMeasurement
-  bool is_initialized_;
-
-  ///* if this is false, laser measurements will be ignored (except for init)
-  bool use_laser_;
-
-  ///* if this is false, radar measurements will be ignored (except for init)
-  bool use_radar_;
-
-  ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-  VectorXd x_;
-
-  ///* state covariance matrix
-  MatrixXd P_;
-
-  ///* predicted sigma points matrix
-  MatrixXd Xsig_pred_;
-
-  ///* time when the state is true, in us
-  long long time_us_;
-
-  ///* Process noise standard deviation longitudinal acceleration in m/s^2
-  double std_a_;
-
-  ///* Process noise standard deviation yaw acceleration in rad/s^2
-  double std_yawdd_;
-
-  ///* Laser measurement noise standard deviation position1 in m
-  double std_laspx_;
-
-  ///* Laser measurement noise standard deviation position2 in m
-  double std_laspy_;
-
-  ///* Radar measurement noise standard deviation radius in m
-  double std_radr_;
-
-  ///* Radar measurement noise standard deviation angle in rad
-  double std_radphi_;
-
-  ///* Radar measurement noise standard deviation radius change in m/s
-  double std_radrd_ ;
-
-  ///* Weights of sigma points
-  VectorXd weights_;
-
-  ///* State dimension
-  int n_x_;
-
-  ///* Augmented state dimension
-  int n_aug_;
-
-  ///* Sigma point spreading parameter
-  double lambda_;
 
   ///* the current NIS for radar
   double NIS_radar_;
@@ -118,21 +73,77 @@ public:
    */
   void Prediction(double delta_t);
 
-  void InitializeLidar(MeasurementPackage measurement_package);
+  const Filter::StateVector &state() const { return filter_.state(); }
 
-  void InitializeRadar(MeasurementPackage measurement_package);
+private:
+  /**
+   * The radar sensor: handles the nonlinear measurement function and Jacobian
+   * calculation for updating the filter. If the first measurement is a radar
+   * measurement, this class also handles initializing the filter using that
+   * first radar measurement.
+   *
+   * The radar returns a three-dimensional measurement vector: range (rho),
+   * angle (phi) and radial speed (rho_dot).
+   */
+  struct Radar : public Filter::Sensor<3, CanonicalizeMeasurementAngle>
+  {
+    explicit Radar(Filter &filter);
+
+    void Initialize(const MeasurementVector &z, double var_v, double var_yaw);
+
+    double Update(const MeasurementVector &z);
+
+  private:
+    // Measurement covariance matrix for radar
+    MeasurementMatrix R_;
+  };
 
   /**
-   * Updates the state and the state covariance matrix using a laser measurement
-   * @param meas_package The measurement at k+1
+   * The laser sensor: much simpler than the Radar sensor, because the
+   * measurement function is linear. If the first measurement is a laser
+   * measurement, this class also handles initializing the filter using that
+   * first laser measurement.
+   *
+   * The laser returns a two-dimensional measurement vector: x and y position.
    */
-  void UpdateLidar(MeasurementPackage measurement_package);
+  struct Laser : public Filter::Sensor<2>
+  {
+    explicit Laser(Filter &filter);
 
-  /**
-   * Updates the state and the state covariance matrix using a radar measurement
-   * @param meas_package The measurement at k+1
-   */
-  void UpdateRadar(MeasurementPackage measurement_package);
+    void Initialize(const MeasurementVector &z, double var_v, double var_yaw);
+
+    double Update(const MeasurementVector &z);
+
+  private:
+    // Measurement covariance matrix for laser
+    MeasurementMatrix R_;
+
+    // Measurement matrix for laser
+    MeasurementStateMatrix H_;
+  };
+
+  ///* if this is false, laser measurements will be ignored (except for init)
+  bool use_laser_;
+
+  ///* if this is false, radar measurements will be ignored (except for init)
+  bool use_radar_;
+
+  double std_a_;
+
+  double std_yawdd_;
+
+  // check whether the tracking toolbox was initiallized or not (first measurement)
+  bool is_initialized_;
+
+  // previous timestamp
+  long long time_us_;
+
+  // We'll have a single Filter object, and it will be updated by the two
+  // Sensor objects, Radar and Laser, which represent our two sensors to be
+  // fused.
+  Filter filter_;
+  Radar radar_;
+  Laser laser_;
 };
 
 #endif /* UKF_H */
