@@ -12,14 +12,14 @@
 
 class UKF {
   /**
-   * Functor to map the phi angle in a state vector into [-pi, pi].
+   * Functor to map the phi angle in a state vector into [-pi, pi).
    */
   struct CanonicalizeStateAngle {
     void operator()(Eigen::Matrix<double, 5, 1> &vector) const;
   };
 
   /**
-   * Functor to map the phi angle in a radar measurement vector into [-pi, pi].
+   * Functor to map the phi angle in a radar measurement vector into [-pi, pi).
    */
   struct CanonicalizeMeasurementAngle {
     void operator()(Eigen::Matrix<double, 3, 1> &vector) const;
