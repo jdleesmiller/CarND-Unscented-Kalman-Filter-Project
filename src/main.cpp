@@ -10,7 +10,6 @@
 #include "tools.h"
 
 using namespace std;
-using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
 
@@ -65,25 +64,25 @@ int main(int argc, char* argv[]) {
   //
   // Read in optional command line arguments.
   //
+  bool output_for_tuning = false;
   bool use_laser = UKF::DEFAULT_USE_LASER;
   bool use_radar = UKF::DEFAULT_USE_RADAR;
   double std_a = UKF::DEFAULT_STD_A;
   double std_yawdd = UKF::DEFAULT_STD_YAWD;
   double lambda = UKF::DEFAULT_LAMBDA;
-  bool output_for_tuning = false;
   switch (argc) {
     case 9:
-    output_for_tuning = string(argv[8]).compare("true") == 0;
+    lambda = atof(argv[8]);
     case 8:
-    lambda = atof(argv[7]);
+    std_yawdd = atof(argv[7]);
     case 7:
-    std_yawdd = atof(argv[6]);
+    std_a = atof(argv[6]);
     case 6:
-    std_a = atof(argv[5]);
+    use_radar = string(argv[5]).compare("true") == 0;
     case 5:
-    use_radar = string(argv[4]).compare("true") == 0;
+    use_laser = string(argv[4]).compare("true") == 0;
     case 4:
-    use_laser = string(argv[3]).compare("true") == 0;
+    output_for_tuning = string(argv[3]).compare("true") == 0;
   }
 
   /**********************************************
