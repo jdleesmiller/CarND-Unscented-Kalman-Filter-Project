@@ -89,7 +89,7 @@ private:
   {
     explicit Radar(Filter &filter);
 
-    void Initialize(const MeasurementVector &z, double var_v, double var_yaw);
+    void Initialize(const MeasurementVector &z);
 
     double Update(const MeasurementVector &z);
 
@@ -110,7 +110,7 @@ private:
   {
     explicit Laser(Filter &filter);
 
-    void Initialize(const MeasurementVector &z, double var_v, double var_yaw);
+    void Initialize(const MeasurementVector &z);
 
     double Update(const MeasurementVector &z);
 

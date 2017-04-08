@@ -7,9 +7,13 @@ using namespace std;
 
 const bool UKF::DEFAULT_USE_LASER = true;
 const bool UKF::DEFAULT_USE_RADAR = true;
-const double UKF::DEFAULT_STD_A = 0.267;
-const double UKF::DEFAULT_STD_YAWD = M_PI / 5.9;
-const double UKF::DEFAULT_LAMBDA = 1.79 - 7.0;
+const double UKF::DEFAULT_STD_A = 0.484;
+const double UKF::DEFAULT_STD_YAWD = M_PI / 5.25;
+const double UKF::DEFAULT_LAMBDA = 2.05 - 7.0;
+
+const double INITIAL_SPEED_VARIANCE = 25;
+const double INITIAL_YAW_VARIANCE = M_PI * M_PI / 16;
+const double INITIAL_YAWD_VARIANCE = M_PI * M_PI / 64;
 
 // Based on
 // http://commons.apache.org/proper/commons-math/javadocs/api-3.1/org/apache/
@@ -59,27 +63,64 @@ UKF::Radar::Radar(UKF::Filter &filter) :
     0, 0, std_radrd * std_radrd;
 }
 
-void UKF::Radar::Initialize(const MeasurementVector &z,
-  double var_v, double var_yaw)
+void UKF::Radar::Initialize(const MeasurementVector &z)
 {
   double rho = z(0);
   double phi = z(1);
+  double var_rho = R_(0, 0);
+  double var_phi = R_(1, 1);
+
   double px = rho * cos(phi);
   double py = rho * sin(phi);
+
+  // In addition to the position, we can also obtain an estimate of the variance
+  // due to measurement error in the radar sensor. Let's take the variance of px
+  // as an example; the variance for py is computed similarly.
+  //
+  // We need to propagate error through a product, rho * cos(phi), and a cosine.
+  // Fortunately, Wikipedia tells us exactly how to do this:
+  // https://en.wikipedia.org/wiki/Propagation_of_uncertainty#Example_formulas
+  // (But note that all of these rules are approximate; they hold only when
+  // the measurement error is small relative to the value being measured.)
+  //
+  // The radar R_ matrix is diagonal, which tells us that measurements of rho
+  // and phi are uncorrelated. The formula for propagating error through the
+  // product AB for normal random variables A and B therefore simplifies to:
+  //
+  // Var(AB) = Var(A) B^2 + Var(B) A^2
+  //
+  // The rule for cos(C) for normal random variable C is:
+  //
+  // Var(cos(C)) = Var(C) sin^2(C)
+  //
+  // Combining the above, we obtain
+  //
+  // Var(rho cos(phi))
+  //   = Var(rho) cos^2(phi) + Var(cos(phi)) rho^2
+  //   =                 ... + Var(phi) sin^2(phi) rho^2
+  //   =                 ... + Var(phi) (py)^2
+  //
+  // Note: it turns out is possible to obtain an exact expression for
+  // Var(cos(phi)): http://nbviewer.jupyter.org/gist/dougalsutherland/8513749
+  // so we could try that if this approximation causes problems.
+  double cos2phi = cos(phi) * cos(phi);
+  double sin2phi = sin(phi) * sin(phi);
+  double var_px = var_rho * cos2phi + var_phi * py * py;
+  double var_py = var_rho * sin2phi + var_phi * px * px;
 
   Filter::StateVector x;
   x << px, py, 0, 0, 0;
 
-  // TODO: can definitely choose better initial values
-  double var_px = 1; // std_laspx_ * std_laspx_;
-  double var_py = 1; // std_laspy_ * std_laspy_;
   Filter::StateMatrix P;
+  double var_v = INITIAL_SPEED_VARIANCE;
+  double var_yaw = INITIAL_YAW_VARIANCE;
+  double var_yawd = INITIAL_YAWD_VARIANCE;
   P <<
-    var_px,      0,     0,       0,       0,
-         0, var_py,     0,       0,       0,
-         0,      0, var_v,       0,       0,
-         0,      0,     0, var_yaw,       0,
-         0,      0,     0,       0, var_yaw;
+        var_px,      0,     0,       0,        0,
+             0, var_py,     0,       0,        0,
+             0,      0, var_v,       0,        0,
+             0,      0,     0, var_yaw,        0,
+             0,      0,     0,       0, var_yawd;
 
   filter_.Initialize(x, P);
 }
@@ -136,19 +177,21 @@ UKF::Laser::Laser(UKF::Filter &filter) : Filter::Sensor<2>(filter) {
     0, 1, 0, 0, 0;
 }
 
-void UKF::Laser::Initialize(const MeasurementVector &z, double var_v,
-  double var_yaw)
+void UKF::Laser::Initialize(const MeasurementVector &z)
 {
   Filter::StateVector x;
   x << z(0), z(1), 0, 0, 0;
 
   Filter::StateMatrix P;
+  double var_v = INITIAL_SPEED_VARIANCE;
+  double var_yaw = INITIAL_YAW_VARIANCE;
+  double var_yawd = INITIAL_YAWD_VARIANCE;
   P <<
-    R_(0),      0,     0,       0,       0,
-         0, R_(3),     0,       0,       0,
-         0,      0, var_v,       0,       0,
-         0,      0,     0, var_yaw,       0,
-         0,      0,     0,       0, var_yaw;
+    R_(0, 0),        0,     0,       0,        0,
+           0, R_(1, 1),     0,       0,        0,
+           0,        0, var_v,       0,        0,
+           0,        0,     0, var_yaw,        0,
+           0,        0,     0,       0, var_yawd;
 
   filter_.Initialize(x, P);
 }
@@ -191,8 +234,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
           NIS_radar_ = radar_.Update(measurement_package.raw_measurements_);
         }
       } else {
-        radar_.Initialize(measurement_package.raw_measurements_,
-          std_a_ * std_a_, std_yawdd_ * std_yawdd_);
+        radar_.Initialize(measurement_package.raw_measurements_);
         is_initialized_ = true;
       }
       break;
@@ -204,8 +246,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
           NIS_laser_ = laser_.Update(measurement_package.raw_measurements_);
         }
       } else {
-        laser_.Initialize(measurement_package.raw_measurements_,
-          std_a_ * std_a_, std_yawdd_ * std_yawdd_);
+        laser_.Initialize(measurement_package.raw_measurements_);
         is_initialized_ = true;
       }
       break;
