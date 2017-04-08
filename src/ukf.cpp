@@ -277,7 +277,8 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
 void UKF::Predict(double delta_t) {
 
   // Predict (augmented) sigma points.
-  Filter::AugmentedStateSigmaMatrix Xsig_aug = filter_.GenerateSigmaPoints();
+  Filter::AugmentedStateSigmaMatrix Xsig_aug =
+    filter_.GenerateAugmentedSigmaPoints();
   Filter::StateSigmaMatrix Xsig_pred;
   double hdt2 = 0.5 * delta_t * delta_t;
   for (size_t i = 0; i < Xsig_aug.cols(); ++i) {

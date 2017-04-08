@@ -15,17 +15,22 @@ struct CanonicalizeIdentity {
 };
 
 /**
- * Generic Kalman Filter class.
+ * Generic Unscented Kalman Filter class.
  *
- * The filter maintains the system state and the variance as its state. The
- * updates to the state are managed by Sensor objects. Multiple Sensor objects
- * can reference the same KalmanFilter.
+ * The filter maintains the system state and the variance as its state, and it
+ * caches the predicted sigma points. The updates to the state are managed by
+ * Sensor objects. Multiple Sensor objects can reference the same
+ * UnscentedKalmanFilter.
  *
  * The template class is parameterised by the dimension of the state vector.
  * Each Sensor template class is also parameterised by the dimension of the
  * measurement vector. This makes it possible to use fixed-size matrix math
  * for improved compile-time correctness checking and (sometimes) better
  * performance.
+ *
+ * The filter and sensors support an optional 'canonicalize' functor that is
+ * called after each state or measurement update to allow the caller to e.g.
+ * canonicalize angles in the state or measurement vector.
  */
 template <int StateSize, int AugmentedStateSize,
   typename CanonicalizeState = CanonicalizeIdentity<StateSize>>
@@ -49,8 +54,8 @@ struct UnscentedKalmanFilter {
     AugmentedStateSize - StateSize> AugmentationMatrix;
 
   /**
-   * A generic sensor for a Kalman Filter. The Sensor is responsible for
-   * updating the state of the filter based on its measurements.
+   * A generic sensor for an UnscentedKalmanFilter. The Sensor is responsible
+   * for updating the state of the filter based on its measurements.
    */
   template <int MeasurementSize,
     typename CanonicalizeMeasurement = CanonicalizeIdentity<MeasurementSize> >
@@ -68,8 +73,8 @@ struct UnscentedKalmanFilter {
       StateMeasurementMatrix;
 
     /**
-     * Constructor: provide a reference to the KalmanFilter that this Sensor
-     * updates.
+     * Constructor: provide a reference to the UnscentedKalmanFilter that this
+     * Sensor updates.
      */
     Sensor(Filter &filter) : filter_(filter) { }
 
@@ -79,6 +84,7 @@ struct UnscentedKalmanFilter {
      * @param z measurement
      * @param H measurement matrix
      * @param R measurement covariance matrix
+     * @return the normalized innovation squared (NIS) for the measurement
      */
     double Update(
       const MeasurementVector &z,
@@ -94,6 +100,7 @@ struct UnscentedKalmanFilter {
      * @param h measurement predicted (possibly non-linearly) from the state
      * @param H measurement matrix (possibly linearized)
      * @param R measurement covariance matrix
+     * @return the normalized innovation squared (NIS) for the measurement
      */
     double UpdateEKF(
       const MeasurementVector &z,
@@ -136,11 +143,12 @@ struct UnscentedKalmanFilter {
     }
 
     /**
-     * TODO
-     * @param  z       [description]
-     * @param  Z_sigma [description]
-     * @param  R       [description]
-     * @return the normalized innovations squared (NIS) score
+     * Update an Unscented Kalman Filter with a new measurement.
+     *
+     * @param z measurement
+     * @param Z_sigma predicted sigma point measurements
+     * @param R measurement noise matrix
+     * @return the normalized innovations squared (NIS) for the measurement
      */
     double UpdateUKF(
       const MeasurementVector &z,
@@ -226,11 +234,11 @@ struct UnscentedKalmanFilter {
   const StateSigmaMatrix &sigma_matrix() const { return sigma_matrix_; }
 
   /**
-   * TODO
+   * Generate sigma points with the augmented state and covariance matrices.
    *
-   * @return   [description]
+   * @return matrix of augmented sigma points
    */
-  AugmentedStateSigmaMatrix GenerateSigmaPoints() {
+  AugmentedStateSigmaMatrix GenerateAugmentedSigmaPoints() {
     AugmentedStateVector x_aug;
     x_aug.fill(0.0);
     x_aug.head(StateSize) = x_;
@@ -260,7 +268,7 @@ struct UnscentedKalmanFilter {
   }
 
   /**
-   * Predict TODO
+   * Predict the new state and covariance from the predicted sigma points.
    *
    * @param X_sigma the predicted sigma matrix
    */
