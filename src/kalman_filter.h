@@ -33,7 +33,7 @@ struct CanonicalizeIdentity {
  * canonicalize angles in the state or measurement vector.
  */
 template <int StateSize, int AugmentedStateSize,
-  typename CanonicalizeState = CanonicalizeIdentity<StateSize>>
+  typename CanonicalizeState = CanonicalizeIdentity<StateSize> >
 struct UnscentedKalmanFilter {
   static const int SigmaSize = 2 * AugmentedStateSize + 1;
 
@@ -124,9 +124,9 @@ struct UnscentedKalmanFilter {
 
       filter_.UpdateOptimal(K * y, K * H);
 
-      // Compute the normalized innovation score y^T S^{-1} y. We already have
-      // the LU factorization of S^T, so we would like to reuse it. To do this,
-      // if we start with
+      // Compute the normalized innovation squared, y^T S^{-1} y. We already
+      // have the LU factorization of S^T, so we would like to reuse it. To do
+      // this, if we start with
       // N = y^T S^{-1} y
       // then
       // N = (S^{-1}^T y)^T y
