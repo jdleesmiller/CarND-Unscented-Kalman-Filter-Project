@@ -5,39 +5,43 @@
 
 using namespace std;
 
+// Default parameters for the constructor.
 const bool UKF::DEFAULT_USE_LASER = true;
 const bool UKF::DEFAULT_USE_RADAR = true;
 const double UKF::DEFAULT_STD_A = 0.484;
 const double UKF::DEFAULT_STD_YAWD = M_PI / 5.25;
 const double UKF::DEFAULT_LAMBDA = 2.05 - 7.0;
 
+// Initial variances for components of the state that we don't observe.
 const double INITIAL_SPEED_VARIANCE = 25;
 const double INITIAL_YAW_VARIANCE = M_PI * M_PI / 16;
 const double INITIAL_YAWD_VARIANCE = M_PI * M_PI / 64;
 
-// Based on
+// For avoiding division by zero: treat numbers smaller than this as zero.
+const double EPSILON = 1e-3;
+
+//
+// Angle Canonicalization
+//
+
+// Map an arbitrary angle to [-pi, pi). Based on
 // http://commons.apache.org/proper/commons-math/javadocs/api-3.1/org/apache/
 //   commons/math3/util/MathUtils.html#normalizeAngle(double,%20double)
-double NormalizeAngle(double theta) {
+double CanonicalizeAngle(double theta) {
   const double TAU = 2 * M_PI;
-  double x = theta;
-  double r = theta - TAU * floor((theta + M_PI) / TAU);
-  // if (fabs(x - r) > 1e-3) {
-  //   cout << "NORM " << x/M_PI << " -> " << r/M_PI << endl;
-  // }
-  return r;
+  return theta - TAU * floor((theta + M_PI) / TAU);
 }
 
 void UKF::CanonicalizeStateAngle::operator()(
   Eigen::Matrix<double, 5, 1> &vector) const
 {
-  vector(3) = NormalizeAngle(vector(3)); // 3: phi
+  vector(3) = CanonicalizeAngle(vector(3)); // 3: phi
 }
 
 void UKF::CanonicalizeMeasurementAngle::operator()(
   Eigen::Matrix<double, 3, 1> &vector) const
 {
-  vector(1) = NormalizeAngle(vector(1)); // 1: phi
+  vector(1) = CanonicalizeAngle(vector(1)); // 1: phi
 }
 
 //
@@ -126,9 +130,7 @@ void UKF::Radar::Initialize(const MeasurementVector &z)
 }
 
 double UKF::Radar::Update(const MeasurementVector &z) {
-  //
   // Find measurement points for predicted sigma points
-  //
   MeasurementSigmaMatrix Z_sigma;
   for (size_t i = 0; i < Z_sigma.cols(); ++i) {
     double px = filter_.sigma_matrix()(0, i);
@@ -141,7 +143,7 @@ double UKF::Radar::Update(const MeasurementVector &z) {
     double range = sqrt(px * px + py * py);
     double angle = atan2(py, px);
     double drange = px * cos(yaw) * speed + py * sin(yaw) * speed;
-    if (fabs(range) > 1e-3) {
+    if (fabs(range) > EPSILON) {
       drange /= range;
     } else {
       drange = 0;
@@ -197,6 +199,7 @@ void UKF::Laser::Initialize(const MeasurementVector &z)
 }
 
 double UKF::Laser::Update(const MeasurementVector &z) {
+  // This is just a standard linear update.
   return Filter::Sensor<2>::Update(z, H_, R_);
 }
 
@@ -219,10 +222,6 @@ UKF::UKF(bool use_laser, bool use_radar, double std_a, double std_yawdd,
 
 UKF::~UKF() {}
 
-/**
- * @param {MeasurementPackage} meas_package The latest measurement data of
- * either radar or laser.
- */
 void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
   double delta_t = (measurement_package.timestamp_ - time_us_) / 1e6;
   switch (measurement_package.sensor_type_) {
@@ -230,7 +229,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
       // cout << "RADAR" << endl;
       if (is_initialized_) {
         if (use_radar_) {
-          Prediction(delta_t);
+          Predict(delta_t);
           NIS_radar_ = radar_.Update(measurement_package.raw_measurements_);
         }
       } else {
@@ -242,7 +241,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
       // cout << "LIDAR" << endl;
       if (is_initialized_) {
         if (use_laser_) {
-          Prediction(delta_t);
+          Predict(delta_t);
           NIS_laser_ = laser_.Update(measurement_package.raw_measurements_);
         }
       } else {
@@ -260,12 +259,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
   // cout << "P_ = " << endl << filter_.covariance() << endl;
 }
 
-/**
- * Predicts sigma points, the state, and the state covariance matrix.
- * @param {double} delta_t the change in time (in seconds) between the last
- * measurement and this one.
- */
-void UKF::Prediction(double delta_t) {
+void UKF::Predict(double delta_t) {
   //
   // Generate (augmented) sigma points.
   //
@@ -281,7 +275,7 @@ void UKF::Prediction(double delta_t) {
   // Predict (augmented) sigma points.
   //
   double hdt2 = 0.5 * delta_t * delta_t;
-  Filter::StateSigmaMatrix Xsig_pred_; // TODO rename
+  Filter::StateSigmaMatrix Xsig_pred;
   for (size_t i = 0; i < Xsig_aug.cols(); ++i) {
     double px = Xsig_aug(0, i);
     double py = Xsig_aug(1, i);
@@ -291,26 +285,26 @@ void UKF::Prediction(double delta_t) {
     double nu_a = Xsig_aug(5, i);
     double nu_dyaw = Xsig_aug(6, i);
 
-    if (fabs(dyaw) > 1e-3) {
+    if (fabs(dyaw) > EPSILON) {
       double r = v / dyaw;
-      Xsig_pred_(0, i) =
+      Xsig_pred(0, i) =
         px + r * (sin(yaw + dyaw * delta_t) - sin(yaw)) +
         hdt2 * cos(yaw) * nu_a;
-      Xsig_pred_(1, i) =
+      Xsig_pred(1, i) =
         py + r * (-cos(yaw + dyaw * delta_t) + cos(yaw)) +
         hdt2 * sin(yaw) * nu_a;
     } else {
-      Xsig_pred_(0, i) =
+      Xsig_pred(0, i) =
         px + v * cos(yaw) * delta_t +
         hdt2 * cos(yaw) * nu_a;
-      Xsig_pred_(1, i) =
+      Xsig_pred(1, i) =
         py + v * sin(yaw) * delta_t +
         hdt2 * sin(yaw) * nu_a;
     }
-    Xsig_pred_(2, i) = v + delta_t * nu_a;
-    Xsig_pred_(3, i) = NormalizeAngle(yaw + dyaw * delta_t + hdt2 * nu_dyaw);
-    Xsig_pred_(4, i) = dyaw + delta_t * nu_dyaw;
+    Xsig_pred(2, i) = v + delta_t * nu_a;
+    Xsig_pred(3, i) = CanonicalizeAngle(yaw + dyaw * delta_t + hdt2 * nu_dyaw);
+    Xsig_pred(4, i) = dyaw + delta_t * nu_dyaw;
   }
 
-  filter_.PredictUKF(Xsig_pred_);
+  filter_.PredictUKF(Xsig_pred);
 }

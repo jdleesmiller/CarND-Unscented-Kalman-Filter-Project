@@ -23,6 +23,23 @@ sys	0m0.013s
 0.292064
 0.415499
 
+Before tidying:
+
+Accuracy - RMSE:
+ 0.071172
+0.0880705
+ 0.588174
+ 0.586496
+Done!
+
+Accuracy - RMSE:
+0.181637
+0.188999
+0.364263
+0.478872
+Done!
+
+
 ### Radar not tracking
 
 This seems like a bug... without lidar, it is pretty hopeless on dataset 2.

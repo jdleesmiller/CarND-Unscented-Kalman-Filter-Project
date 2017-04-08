@@ -11,14 +11,24 @@
 #include "kalman_filter.h"
 
 class UKF {
+  /**
+   * Functor to map the phi angle in a state vector into [-pi, pi].
+   */
   struct CanonicalizeStateAngle {
     void operator()(Eigen::Matrix<double, 5, 1> &vector) const;
   };
 
+  /**
+   * Functor to map the phi angle in a radar measurement vector into [-pi, pi].
+   */
   struct CanonicalizeMeasurementAngle {
     void operator()(Eigen::Matrix<double, 3, 1> &vector) const;
   };
 
+  /**
+   * Internal filter that implements the generic parts of the UKF; this class
+   * implements the parts that are specific to the CTRV model.
+   */
   typedef UnscentedKalmanFilter<5, 7, CanonicalizeStateAngle> Filter;
 
 public:
@@ -61,26 +71,32 @@ public:
   virtual ~UKF();
 
   /**
-   * ProcessMeasurement
-   * @param meas_package The latest measurement data of either radar or laser
+   * ProcessMeasurement: the main entrypoint; handles both initialization and
+   * updating as required.
+   *
+   * @param measurement_package The latest measurement data of either radar or
+   *                            laser
    */
   void ProcessMeasurement(MeasurementPackage measurement_package);
 
   /**
-   * Prediction Predicts sigma points, the state, and the state covariance
-   * matrix
-   * @param delta_t Time between k and k+1 in s
+   * Predict sigma points, the state, and the state covariance matrix.
+   *
+   * @param delta_t Time between k and k+1 in seconds
    */
-  void Prediction(double delta_t);
+  void Predict(double delta_t);
 
+  /**
+   * @return the latest state estimate (undefined if uninitialized)
+   */
   const Filter::StateVector &state() const { return filter_.state(); }
 
 private:
   /**
-   * The radar sensor: handles the nonlinear measurement function and Jacobian
-   * calculation for updating the filter. If the first measurement is a radar
-   * measurement, this class also handles initializing the filter using that
-   * first radar measurement.
+   * The radar sensor: handles the nonlinear measurement function and its
+   * application to sigma points for updating the filter. If the first
+   * measurement is a radar measurement, this class also handles initializing
+   * the filter using that first radar measurement.
    *
    * The radar returns a three-dimensional measurement vector: range (rho),
    * angle (phi) and radial speed (rho_dot).
@@ -89,8 +105,19 @@ private:
   {
     explicit Radar(Filter &filter);
 
+    /**
+     * Initialize the filter with the given measurement.
+     *
+     * @param z the measurement
+     */
     void Initialize(const MeasurementVector &z);
 
+    /**
+     * Update the filter with a new measurement.
+     *
+     * @param z the measurement
+     * @return the normalized innovation squared (NIS) for the measurement
+     */
     double Update(const MeasurementVector &z);
 
   private:
@@ -110,8 +137,19 @@ private:
   {
     explicit Laser(Filter &filter);
 
+    /**
+     * Initialize the filter with the given measurement.
+     *
+     * @param z the measurement
+     */
     void Initialize(const MeasurementVector &z);
 
+    /**
+     * Update the filter with a new measurement.
+     *
+     * @param z the measurement
+     * @return the normalized innovation squared (NIS) for the measurement
+     */
     double Update(const MeasurementVector &z);
 
   private:
@@ -138,9 +176,8 @@ private:
   // previous timestamp
   long long time_us_;
 
-  // We'll have a single Filter object, and it will be updated by the two
-  // Sensor objects, Radar and Laser, which represent our two sensors to be
-  // fused.
+  // We have a single Filter object, and it will be updated by the two Sensor
+  // objects, Radar and Laser, which represent our two sensors to fuse.
   Filter filter_;
   Radar radar_;
   Laser laser_;
