@@ -28,9 +28,10 @@ struct CanonicalizeIdentity {
  * performance.
  */
 template <int StateSize, int AugmentedStateSize,
-  typename CanonicalizeState = CanonicalizeIdentity<StateSize>,
-  int SigmaSize = 2 * AugmentedStateSize + 1>
+  typename CanonicalizeState = CanonicalizeIdentity<StateSize>>
 struct UnscentedKalmanFilter {
+  static const int SigmaSize = 2 * AugmentedStateSize + 1;
+
   typedef Eigen::Matrix<double, StateSize, 1> StateVector;
   typedef Eigen::Matrix<double, StateSize, StateSize> StateMatrix;
 
@@ -45,7 +46,7 @@ struct UnscentedKalmanFilter {
     AugmentedStateSigmaMatrix;
   typedef Eigen::Matrix<double,
     AugmentedStateSize - StateSize,
-    AugmentedStateSize - StateSize> AugmentedNoiseMatrix;
+    AugmentedStateSize - StateSize> AugmentationMatrix;
 
   /**
    * A generic sensor for a Kalman Filter. The Sensor is responsible for
@@ -195,8 +196,8 @@ struct UnscentedKalmanFilter {
    * Constructor: the state and covariance matrices are uninitialized (may
    * contain values from uninitialized memory).
    */
-  UnscentedKalmanFilter(double lambda) :
-    UnscentedKalmanFilter(StateVector(), StateMatrix(), lambda) {}
+  UnscentedKalmanFilter(double lambda, const AugmentationMatrix &Q) :
+    UnscentedKalmanFilter(StateVector(), StateMatrix(), lambda, Q) {}
 
   /**
    * Constructor.
@@ -206,9 +207,10 @@ struct UnscentedKalmanFilter {
    * @param lambda for calculation of weights
    */
   UnscentedKalmanFilter(
-    const StateVector &x, const StateMatrix &P, double lambda)
-    : I_(StateMatrix::Identity()), x_(x), P_(P),
-      lambda_(lambda),
+    const StateVector &x, const StateMatrix &P,
+    double lambda, const AugmentationMatrix &Q)
+    : canonicalize_(), I_(StateMatrix::Identity()),
+      x_(x), P_(P), lambda_(lambda), Q_(Q),
       sigma_weights_(MakeSigmaWeights(lambda)),
       sigma_matrix_(StateSigmaMatrix::Zero()) // initialize for safety
   { }
@@ -226,10 +228,9 @@ struct UnscentedKalmanFilter {
   /**
    * TODO
    *
-   * @param  Q [description]
    * @return   [description]
    */
-  AugmentedStateSigmaMatrix GenerateSigmaPoints(const AugmentedNoiseMatrix &Q) {
+  AugmentedStateSigmaMatrix GenerateSigmaPoints() {
     AugmentedStateVector x_aug;
     x_aug.fill(0.0);
     x_aug.head(StateSize) = x_;
@@ -237,7 +238,7 @@ struct UnscentedKalmanFilter {
     AugmentedStateMatrix P_aug;
     P_aug.fill(0.0);
     P_aug.topLeftCorner(StateSize, StateSize) = P_;
-    P_aug.bottomRightCorner(Q.rows(), Q.cols()) = Q;
+    P_aug.bottomRightCorner(Q_.rows(), Q_.cols()) = Q_;
 
     Eigen::LLT<AugmentedStateMatrix> lltA = P_aug.llt();
     if (lltA.info() != Eigen::ComputationInfo::Success) {
@@ -329,10 +330,10 @@ private:
   }
 
   // Functor to canonicalize the state.
-  CanonicalizeState canonicalize_;
+  const CanonicalizeState canonicalize_;
 
   // Identity matrix (for UpdateOptimal)
-  StateMatrix I_;
+  const StateMatrix I_;
 
   // State vector
   StateVector x_;
@@ -340,8 +341,11 @@ private:
   // State covariance matrix
   StateMatrix P_;
 
+  // State covariance augmentation matrix
+  const AugmentationMatrix Q_;
+
   // Sigma point spreading parameter
-  double lambda_;
+  const double lambda_;
 
   // Weight vector for sigma point matrix
   const SigmaVector sigma_weights_;

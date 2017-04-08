@@ -25,13 +25,13 @@ class UKF {
     void operator()(Eigen::Matrix<double, 3, 1> &vector) const;
   };
 
+public:
+
   /**
    * Internal filter that implements the generic parts of the UKF; this class
    * implements the parts that are specific to the CTRV model.
    */
   typedef UnscentedKalmanFilter<5, 7, CanonicalizeStateAngle> Filter;
-
-public:
 
   ///* the current NIS for radar
   double NIS_radar_;
@@ -165,10 +165,6 @@ private:
 
   ///* if this is false, radar measurements will be ignored (except for init)
   bool use_radar_;
-
-  double std_a_;
-
-  double std_yawdd_;
 
   // check whether the tracking toolbox was initiallized or not (first measurement)
   bool is_initialized_;

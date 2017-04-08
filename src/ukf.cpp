@@ -203,6 +203,23 @@ double UKF::Laser::Update(const MeasurementVector &z) {
   return Filter::Sensor<2>::Update(z, H_, R_);
 }
 
+//
+// Filter
+//
+
+/**
+ * Make the 'Q' matrix to add to the lower right block of the augmented
+ * covariance (P_aug) matrix.
+ */
+UKF::Filter::AugmentationMatrix MakeQMatrix(double std_a, double std_yawdd)
+{
+  UKF::Filter::AugmentationMatrix Q;
+  Q <<
+    std_a * std_a,                     0,
+                0, std_yawdd * std_yawdd;
+  return Q;
+}
+
 /**
  * Initializes Unscented Kalman filter
  */
@@ -212,11 +229,9 @@ UKF::UKF(bool use_laser, bool use_radar, double std_a, double std_yawdd,
   NIS_laser_(0),
   use_laser_(use_laser),
   use_radar_(use_radar),
-  std_a_(std_a),
-  std_yawdd_(std_yawdd),
   is_initialized_(false),
   time_us_(0),
-  filter_(lambda),
+  filter_(lambda, MakeQMatrix(std_a, std_yawdd)),
   radar_(filter_),
   laser_(filter_) {}
 
@@ -260,22 +275,11 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_package) {
 }
 
 void UKF::Predict(double delta_t) {
-  //
-  // Generate (augmented) sigma points.
-  //
-  Filter::AugmentedNoiseMatrix Q;
-  Q <<
-    std_a_ * std_a_, 0,
-    0, std_yawdd_ * std_yawdd_;
 
-  Filter::AugmentedStateSigmaMatrix Xsig_aug =
-    filter_.GenerateSigmaPoints(Q);
-
-  //
   // Predict (augmented) sigma points.
-  //
-  double hdt2 = 0.5 * delta_t * delta_t;
+  Filter::AugmentedStateSigmaMatrix Xsig_aug = filter_.GenerateSigmaPoints();
   Filter::StateSigmaMatrix Xsig_pred;
+  double hdt2 = 0.5 * delta_t * delta_t;
   for (size_t i = 0; i < Xsig_aug.cols(); ++i) {
     double px = Xsig_aug(0, i);
     double py = Xsig_aug(1, i);
